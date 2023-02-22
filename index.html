@@ -1,0 +1,229 @@
+<html>
+<style>div.fixed {
+  position: fixed;
+  width: 50%;
+  bottom: 10px;
+} </style>
+<head>
+ <link rel="stylesheet" type="text/css" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-ajax-native@1.0.2/src/jquery-ajax-native.min.js"></script>
+
+<script type="text/javascript">
+
+
+  //This sends an AJAX request to the server upon clicking the button.
+  //var serverIp = "http://34.71.104.216:8082"; //LIVE
+   var serverIp = "http://localhost:8082" //DEV
+  var serverIpNew = "http://34.71.104.216:8082"; //LIVE
+   var timestamp = ""
+  $(document).ready(function(){
+
+  //checking cookie
+  var cookie = getCookie("fulfilmenttool_cookie");
+    if (cookie == null) {
+        timestamp = Math.floor(Math.random() * (new Date().getTime() + ""))
+        setCookie("fulfilmenttool_cookie", timestamp, 1)
+        console.log("No cookie found. Creating cookie:  " + timestamp);
+    }
+    else {
+        timestamp = cookie;
+        console.log("Retrieved cookie: " + cookie)
+    }
+  
+
+  $('#startdate').datepicker({
+    changeMonth: true,
+    changeYear: true,
+    showButtonPanel: true,
+    dateFormat: "yy-mm-dd"
+});
+
+$('#enddate').datepicker({
+    changeMonth: true,
+    changeYear: true,
+    showButtonPanel: true,
+    dateFormat: "yy-mm-dd"
+});
+
+
+
+  getOptions();
+   $("#spinner").hide();
+   $("#downloadbutton").hide();
+    window.setInterval(function(){
+  $.ajax({
+    url: serverIp + "/update?datestring=" + timestamp,
+    success: function (data) {
+        $('#status').html(data);
+        if (data.includes("Download")) {
+            $("#downloadbutton").show();
+            $("#spinner").hide();
+            $("#selector").hide();
+             $("#uploadbutton").hide();
+           }
+           else if (data.includes("match!")) {
+              $("#selector").show();
+  $("#spinner").hide();
+  $("#uploadbutton").show();
+
+    }},
+
+    error: function (error) {
+        console.log("error.");
+        $('#status').html("Error with connection.");
+        $("#spinner").hide();
+    },
+    type: 'GET'
+  });
+}, 1000);
+
+
+   $( "#downloadbutton" ).click(function() {
+  $("#spinner").show();
+  $("#uploadbutton").hide();
+  $("#selector").hide();
+  $("#downloadbutton").hide();
+  console.log("download");
+  $.ajax({
+    url: serverIp + "/download?datestring=" + timestamp,
+    xhrFields: {
+    responseType: 'blob'
+  },
+  success: function(blob){
+    console.log(blob.size);
+      var link=document.createElement('a');
+      link.href=window.URL.createObjectURL(blob);
+      link.download="output.zip";
+      link.click();
+      location.reload();
+      //window.location.replace("https://upload.wikimedia.org/wikipedia/commons/1/18/Carassius_carassius.jpg");
+  }
+  });
+});
+
+  $( "#uploadbutton" ).click(function() {
+  $("#selector").hide();
+  $("#spinner").show();
+  $("#uploadbutton").hide();
+  $("#downloadbutton").hide();
+  var formData = new FormData();
+  console.log("run files");
+  var newUrl = serverIp + "?type=" + $("#options").val() + "&fromdate=" + $("#startdate").val() + "&todate=" + $("#enddate").val() + "&datestring=" + timestamp
+  console.log("URL is: " + newUrl)
+  $.ajax({
+    url: newUrl,
+    processData: false,
+    success: function (data) {
+        $('#place').html(data);
+    },
+    type: 'POST'
+  });
+});
+
+function getCookie(name) {
+    var dc = document.cookie;
+    var prefix = name + "=";
+    var begin = dc.indexOf("; " + prefix);
+    if (begin == -1) {
+        begin = dc.indexOf(prefix);
+        if (begin != 0) return null;
+    }
+    else
+    {
+        begin += 2;
+        var end = document.cookie.indexOf(";", begin);
+        if (end == -1) {
+        end = dc.length;
+        }
+    }
+    return decodeURI(dc.substring(begin + prefix.length, end));
+}
+
+function setCookie(name,value,days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+}
+
+function getOptions(){
+  $.ajax({
+    url: serverIpNew + "/gettitles",
+    success: function (data) {
+        console.log("data is: " + data)
+        var options = $.parseJSON(data)
+        $.each(options, function(key,val) {
+            console.log("found: " + val)
+            $("#options").append(new Option(val, val));
+        }); 
+    },
+    error: function() {
+        console.log("error with options.")
+	}
+    })
+}
+
+
+
+   $( "#templatebutton" ).click(function() {
+  $("#spinner").show();
+  $("#uploadbutton").hide();
+  $("#selector").hide();
+  $("#downloadbutton").hide();
+  console.log("download");
+  $.ajax({
+    url: serverIp + "/template",
+    xhrFields: {
+    responseType: 'blob'
+  },
+  success: function(blob){
+    console.log(blob.size);
+      var link=document.createElement('a');
+      link.href=window.URL.createObjectURL(blob);
+      link.download="template.csv";
+      link.click();
+      //window.location.replace("https://upload.wikimedia.org/wikipedia/commons/1/18/Carassius_carassius.jpg");
+  }
+  });
+});
+
+
+
+});
+</script>
+</head>
+<body>
+<h2>Aditus fulfillment tool</h2>
+<form>
+ <div id="selector">
+    <label for="options">Choose an option:</label>
+        <select id="options">
+        </select>
+        <br>
+   Start date: <input type="text" id="startdate" name="startdate"/> <br/>
+   End date: <input type="text" id="enddate" name="enddate"/> <br/>
+ </div>
+</form>
+
+<div id="uploadbutton"><button type="button">Get files!</button></div>
+
+<div id="place">
+</div>
+<p>Tool status:</p>
+<div id="status">
+</div>
+<br>
+<div id="downloadbutton">
+  <button type="button">Download file</button>
+</div>
+<div id="spinner"><img src="https://mir-s3-cdn-cf.behance.net/project_modules/disp/1f430a36197347.57135ca19bbf5.gif"></img></div>
+<p><img src="https://ojibwe.lib.umn.edu/uploads/collections/images/local_collection_image/666864/sturgeon.png" width="300px"></img></p>
+<p><a href="http://146.148.19.152/sql.php?server=1&db=aditus&table=aditus_fulfilment&pos=0"><button>Go to the Fulfilment database</button></a></p>
+</body>
+<div class="fixed">Version 1.83</div>
+</html>
